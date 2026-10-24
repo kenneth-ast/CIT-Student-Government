@@ -570,8 +570,8 @@
 
   // Your Supabase project details: Project Settings > API (or "Connect").
   // The anon key is meant to be public; your data is protected by the rules in supabase-setup.sql.
-  const SUPABASE_URL = "https://uhzdgevvfvzpiodialpd.supabase.co/rest/v1/";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoemRnZXZ2ZnZ6cGlvZGlhbHBkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODIxODgsImV4cCI6MjEwODM1ODE4OH0.PXnXSZEQheEGFS3tmt89vemWHuXLzgi_cscAR9d6Z5w";
+  const SUPABASE_URL = "";
+  const SUPABASE_ANON_KEY = "";
 
   // Default menu choices. Admins can change them on the Manage Options page,
   // and those changes are saved online for every device.
@@ -598,8 +598,22 @@
 
   $("yr").textContent = new Date().getFullYear();
 
-  const sb = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  // Accept the URL even if extra text was pasted (e.g. ".../rest/v1/" or a dashboard link):
+  // Supabase needs only https://<project-ref>.supabase.co
+  function cleanSupabaseUrl(u) {
+    u = String(u || "").trim().replace(/^["']|["']$/g, "");
+    const dash = u.match(/supabase\.com\/dashboard\/project\/([a-z0-9]{15,25})/i);   // dashboard link
+    if (dash) return "https://" + dash[1].toLowerCase() + ".supabase.co";
+    const m = u.match(/^(https?:\/\/[^\/?#\s]+)/i);
+    if (m) return m[1];
+    const ref = u.match(/^([a-z0-9]{15,25})(\.supabase\.co)?$/i);   // just the project ref
+    return ref ? "https://" + ref[1].toLowerCase() + ".supabase.co" : u;
+  }
+  const SB_URL = cleanSupabaseUrl(SUPABASE_URL);
+  const SB_KEY = String(SUPABASE_ANON_KEY || "").trim().replace(/^["']|["']$/g, "");
+
+  const sb = (SB_URL && SB_KEY && window.supabase)
+    ? window.supabase.createClient(SB_URL, SB_KEY)
     : null;
 
   let me = null;   // signed-in user: { id, email, name, role }  (role is null until approved)
