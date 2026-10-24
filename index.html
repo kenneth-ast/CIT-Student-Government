@@ -228,6 +228,17 @@
   .btn-confirm-danger { background: var(--error); color: #fff; }
   .btn-confirm-danger:hover { background: #a61f1f; }
 
+  /* online accounts */
+  body.booting #authView .auth-card { visibility: hidden; }
+  body:not(.is-admin) .admin-only { display: none !important; }
+  .setup-note {
+    background: #fff7e0; border: 1px solid var(--accent); border-radius: 8px;
+    padding: 10px 12px; font-size: .85rem; margin-bottom: 14px;
+  }
+  .auth-info { color: var(--ok); font-size: .85rem; margin-bottom: 8px; }
+  #pendingBox h2 { margin: 0 0 8px; font-size: 1.1rem; color: var(--brand); }
+  #pendingBox p { color: var(--muted); font-size: .92rem; margin: 0 0 16px; }
+
   @media print { .modal { display: none !important; } }
   @media print { .drawer, .overlay { display: none !important; } }
   @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } .card { padding: 18px; } }
@@ -238,8 +249,9 @@
     #slip { display: block !important; border: 2px solid #000; box-shadow: none; }
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="locked">
+<body class="locked booting">
 
 <!-- LOGIN / SIGN UP -->
 <div id="authView">
@@ -247,50 +259,64 @@
     <h1>CIT STUDENT GOVERNMENT TRANSACTION SITE</h1>
     <p class="tag">Sign in to access the site</p>
 
-    <div class="tabs" role="tablist">
-      <button type="button" id="tabSignin" class="active">Sign In</button>
-      <button type="button" id="tabSignup">Sign Up</button>
+    <div class="setup-note" id="setupNote" style="display:none">
+      This site isn't connected to its database yet. The site owner needs to add the Supabase URL and key in index.html.
     </div>
 
-    <form id="signinForm" novalidate>
-      <div class="field">
-        <label for="siUser">USERNAME</label>
-        <input type="text" id="siUser" autocomplete="username" maxlength="30">
+    <div id="authForms">
+      <div class="tabs" role="tablist">
+        <button type="button" id="tabSignin" class="active">Sign In</button>
+        <button type="button" id="tabSignup">Sign Up</button>
       </div>
-      <div class="field">
-        <label for="siPass">PASSWORD</label>
-        <input type="password" id="siPass" autocomplete="current-password">
-      </div>
-      <label class="check"><input type="checkbox" id="siKeep"> Keep me signed in on this device</label>
-      <div class="auth-err" id="signinErr" role="alert"></div>
-      <button type="submit" class="btn-primary" id="signinBtn">Sign In</button>
-    </form>
 
-    <form id="signupForm" novalidate style="display:none">
-      <div class="field">
-        <label for="suName">FULL NAME</label>
-        <input type="text" id="suName" autocomplete="name" maxlength="80">
-      </div>
-      <div class="field">
-        <label for="suUser">USERNAME</label>
-        <input type="text" id="suUser" autocomplete="username" maxlength="30" placeholder="letters, numbers, . _ -">
-      </div>
-      <div class="field">
-        <label for="suPass">PASSWORD</label>
-        <input type="password" id="suPass" autocomplete="new-password" placeholder="at least 6 characters">
-      </div>
-      <div class="field">
-        <label for="suPass2">CONFIRM PASSWORD</label>
-        <input type="password" id="suPass2" autocomplete="new-password">
-      </div>
-      <div class="field" id="codeField">
-        <label for="suCode">ACCESS CODE</label>
-        <input type="text" id="suCode" autocomplete="off" maxlength="40">
-      </div>
-      <div class="auth-err" id="signupErr" role="alert"></div>
-      <button type="submit" class="btn-primary" id="signupBtn">Create Account</button>
-    </form>
+      <form id="signinForm" novalidate>
+        <div class="field">
+          <label for="siEmail">EMAIL</label>
+          <input type="email" id="siEmail" autocomplete="email" maxlength="120">
+        </div>
+        <div class="field">
+          <label for="siPass">PASSWORD</label>
+          <input type="password" id="siPass" autocomplete="current-password">
+        </div>
+        <div class="auth-err" id="signinErr" role="alert"></div>
+        <button type="submit" class="btn-primary" id="signinBtn">Sign In</button>
+      </form>
 
+      <form id="signupForm" novalidate style="display:none">
+        <div class="field">
+          <label for="suName">FULL NAME</label>
+          <input type="text" id="suName" autocomplete="name" maxlength="80">
+        </div>
+        <div class="field">
+          <label for="suEmail">EMAIL</label>
+          <input type="email" id="suEmail" autocomplete="email" maxlength="120">
+        </div>
+        <div class="field">
+          <label for="suPass">PASSWORD</label>
+          <input type="password" id="suPass" autocomplete="new-password" placeholder="at least 6 characters">
+        </div>
+        <div class="field">
+          <label for="suPass2">CONFIRM PASSWORD</label>
+          <input type="password" id="suPass2" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label for="suCode">ACCESS CODE</label>
+          <input type="text" id="suCode" autocomplete="off" maxlength="40" placeholder="given by a CIT-SG officer">
+        </div>
+        <div class="auth-err" id="signupErr" role="alert"></div>
+        <div class="auth-info" id="signupInfo" role="status"></div>
+        <button type="submit" class="btn-primary" id="signupBtn">Create Account</button>
+      </form>
+    </div>
+
+    <div id="pendingBox" style="display:none">
+      <h2>Waiting for approval</h2>
+      <p>Your account was created, but it hasn't been approved yet. Ask a CIT-SG officer to approve it, then press "Check again".</p>
+      <div class="actions">
+        <button type="button" class="btn-primary" id="pendingRecheck">Check again</button>
+        <button type="button" class="btn-secondary" id="pendingSignout">Sign out</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -299,7 +325,7 @@
     <span></span><span></span><span></span>
   </button>
   <h1>CIT STUDENT GOVERNMENT TRANSACTION SITE</h1>
-  <p>College of Industrial Technology &middot; Student Government - Dipolog Campus</p>
+  <p>College of Industrial Technology &middot; Student Government</p>
 </header>
 
 <main>
@@ -351,6 +377,7 @@
         </div>
       </div>
 
+      <div class="err" id="submitErr" role="alert"></div>
       <div class="actions">
         <button type="submit" class="btn-primary" id="submitBtn">Submit Payment</button>
         <button type="reset" class="btn-secondary" id="resetBtn">Clear Form</button>
@@ -377,8 +404,8 @@
 
   <!-- TRANSACTION LOG -->
   <section class="card" id="logCard">
-    <h2>Transactions on this device</h2>
-    <p class="sub">Saved in this browser only.</p>
+    <h2>Transactions</h2>
+    <p class="sub">Shared online with all signed-in officers.</p>
     <div class="print-head">
       <div class="print-site">CIT STUDENT GOVERNMENT TRANSACTION SITE</div>
       <div><b>TRANSACTIONS</b></div>
@@ -397,7 +424,7 @@
     <div class="total-line"><span>Total</span><span id="logTotal">&#8369;0.00</span></div>
     <div class="actions">
       <button class="btn-primary" id="pdfBtn" type="button">Print / Save as PDF</button>
-      <button class="btn-danger" id="clearLogBtn" type="button">Clear log</button>
+      <button class="btn-danger admin-only" id="clearLogBtn" type="button">Clear log</button>
     </div>
   </section>
   </div><!-- /payView -->
@@ -409,10 +436,9 @@
       <p class="sub">Add or remove the choices shown in the payment form menus.</p>
       <div id="optionGroups"></div>
       <div class="actions">
-        <button class="btn-secondary" id="copyBtn" type="button">Copy settings</button>
         <button class="btn-danger" id="resetOptsBtn" type="button">Reset to defaults</button>
       </div>
-      <p class="notice">Changes are saved in this browser only. To make them the default for everyone, click "Copy settings" and paste the result over <b>DEFAULT_OPTIONS</b> in index.html, then redeploy.</p>
+      <p class="notice">Changes are saved online and apply to every device.</p>
     </section>
   </div>
 
@@ -448,7 +474,7 @@
       <div class="actions">
         <button class="btn-primary" id="repPrintBtn" type="button">Print / Save as PDF</button>
       </div>
-      <p class="notice no-print">In the print window, choose "Save as PDF" as the destination to get a PDF file. Transactions come from this device's log.</p>
+      <p class="notice no-print">In the print window, choose "Save as PDF" as the destination to get a PDF file. Transactions come from the shared online log.</p>
     </section>
   </div>
 
@@ -509,7 +535,7 @@
       <div class="actions">
         <button class="btn-primary" id="liqPrintBtn" type="button">Print / Save as PDF</button>
       </div>
-      <p class="notice no-print">In the print window, choose "Save as PDF" as the destination to get a PDF file. Transactions come from this device's log.</p>
+      <p class="notice no-print">In the print window, choose "Save as PDF" as the destination to get a PDF file. Transactions come from the shared online log.</p>
     </section>
   </div>
 </main>
@@ -518,7 +544,7 @@
 <div class="modal" id="clearModal" role="dialog" aria-modal="true" aria-labelledby="clearTitle">
   <div class="modal-box">
     <h3 id="clearTitle">Clear all transactions?</h3>
-    <p id="clearMsg">All transactions saved on this device will be permanently deleted. This cannot be undone.</p>
+    <p id="clearMsg">All transactions will be permanently deleted for every officer. This cannot be undone.</p>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="clearCancel">Cancel</button>
       <button type="button" class="btn-confirm-danger" id="clearConfirm">Yes, clear log</button>
@@ -533,7 +559,7 @@
   <button class="nav active" type="button" data-view="pay">Payment Form</button>
   <button class="nav" type="button" data-view="report">Type of Payment</button>
   <button class="nav" type="button" data-view="liquidation">Liquidation</button>
-  <button class="nav" type="button" data-view="settings">Manage Options</button>
+  <button class="nav admin-only" type="button" data-view="settings">Manage Options</button>
   <button class="nav logout" type="button" id="logoutBtn">Sign out</button>
 </nav>
 
@@ -542,7 +568,13 @@
 <script>
   /* ====== SETTINGS (edit these) ====== */
 
-  // Default menu choices. You can also add more from the Manage Options page.
+  // Your Supabase project details: Project Settings > API (or "Connect").
+  // The anon key is meant to be public; your data is protected by the rules in supabase-setup.sql.
+  const SUPABASE_URL = "";
+  const SUPABASE_ANON_KEY = "";
+
+  // Default menu choices. Admins can change them on the Manage Options page,
+  // and those changes are saved online for every device.
   const DEFAULT_OPTIONS = {
     courses: ["BSIT"],
     years: ["1st Year", "2nd Year", "3rd Year", "4th Year"],
@@ -557,46 +589,76 @@
     ]
   };
 
-  // Optional PIN to open Manage Options (leave "" for no PIN).
-  // This is only a light barrier: it is visible in the page source.
-  const ADMIN_PIN = "";
-
-  // Optional access code required to create an account (leave "" to let anyone sign up).
-  // Visible in the page source, so treat it as a light barrier only.
-  const SIGNUP_CODE = "";
-
-  // Optional: paste a Google Apps Script web app URL here to also send each
-  // transaction to a Google Sheet. Leave empty to store on this device only.
-  const SHEET_URL = "";
-
   /* ==================================== */
 
-  const STORAGE_KEY = "cit_sg_transactions_v1";
   const $ = (id) => document.getElementById(id);
   const form = $("payForm");
-  const peso = (n) => "\u20B1" + Number(n).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const peso = (n) => "₱" + Number(n).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtDate = (d) => d.toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" });
 
   $("yr").textContent = new Date().getFullYear();
 
+  const sb = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+  let me = null;   // signed-in user: { id, email, name, role }  (role is null until approved)
+  let LOG = [];    // transactions loaded from the online database
+  const isMember = () => !!(me && me.role);
+  const isAdmin = () => !!(me && me.role === "admin");
+
+  function localDay(d) {
+    const p = (n) => String(n).padStart(2, "0");
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+  function dayOf(t) { return t.day || null; }
+
+  /* ---------- Online data: transactions ---------- */
+  function rowToTx(r) {
+    const d = new Date(r.created_at);
+    return {
+      ref: r.ref, date: fmtDate(d), day: localDay(d),
+      name: r.name, course: r.course, year: r.year, type: r.type, amount: Number(r.amount)
+    };
+  }
+
+  async function refreshLog() {
+    let all = [], from = 0;
+    for (;;) {
+      const { data, error } = await sb.from("transactions").select("*")
+        .order("created_at", { ascending: true }).range(from, from + 999);
+      if (error) throw error;
+      all = all.concat(data);
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+    LOG = all.map(rowToTx);
+  }
+  function loadLog() { return LOG; }
+
   /* ---------- Menu options (course / year / type of payment) ---------- */
-  const OPTIONS_KEY = "cit_sg_options_v1";
   const GROUPS = [
     { key: "courses", label: "Course", select: "course", placeholder: "-- Select course --" },
     { key: "years", label: "Year", select: "year", placeholder: "-- Select year --" },
     { key: "types", label: "Type of Payment", select: "paymentType", placeholder: "-- Select type of payment --" }
   ];
+  let options = JSON.parse(JSON.stringify(DEFAULT_OPTIONS));
 
-  function loadOptions() {
-    const out = JSON.parse(JSON.stringify(DEFAULT_OPTIONS));
-    try {
-      const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY));
-      if (saved) GROUPS.forEach((g) => { if (Array.isArray(saved[g.key])) out[g.key] = saved[g.key]; });
-    } catch (e) {}
-    return out;
+  async function loadOptionsOnline() {
+    const { data, error } = await sb.from("options").select("key, items");
+    if (error) throw error;
+    options = JSON.parse(JSON.stringify(DEFAULT_OPTIONS));
+    (data || []).forEach((r) => { if (Array.isArray(r.items)) options[r.key] = r.items; });
   }
-  let options = loadOptions();
-  function saveOptions() {
-    try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(options)); } catch (e) {}
+
+  async function saveOptions() {
+    const rows = GROUPS.map((g) => ({ key: g.key, items: options[g.key] }));
+    const { error } = await sb.from("options").upsert(rows);
+    if (error) {
+      alert("Could not save the options. Only admins can change them.");
+      try { await loadOptionsOnline(); } catch (e) {}
+      fillSelects(); renderOptionGroups();
+    }
   }
 
   function fillSelects() {
@@ -677,11 +739,6 @@
     });
   }
 
-  $("copyBtn").addEventListener("click", async () => {
-    const text = JSON.stringify(options, null, 2);
-    try { await navigator.clipboard.writeText(text); alert("Settings copied."); }
-    catch (e) { window.prompt("Copy these settings:", JSON.stringify(options)); }
-  });
   $("resetOptsBtn").addEventListener("click", () => {
     if (!confirm("Reset all options to the defaults?")) return;
     options = JSON.parse(JSON.stringify(DEFAULT_OPTIONS));
@@ -695,41 +752,43 @@
     overlay.classList.toggle("open", open);
     menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
   }
-  function showView(name) {
-    if (!currentUser()) return;
-    if (name === "settings" && ADMIN_PIN) {
-      const pin = window.prompt("Enter PIN to manage options:");
-      if (pin !== ADMIN_PIN) { if (pin !== null) alert("Incorrect PIN."); return; }
-    }
+
+  function setViewDisplay(name) {
     $("payView").style.display = name === "pay" ? "" : "none";
     $("settingsView").style.display = name === "settings" ? "block" : "none";
     $("reportView").style.display = name === "report" ? "block" : "none";
     $("liqView").style.display = name === "liquidation" ? "block" : "none";
-    document.querySelectorAll(".drawer .nav").forEach((b) => {
+    document.querySelectorAll(".drawer .nav[data-view]").forEach((b) => {
       b.classList.toggle("active", b.dataset.view === name);
     });
+  }
+
+  function showView(name) {
+    if (!isMember()) return;
+    if (name === "settings" && !isAdmin()) return;
+    setViewDisplay(name);
     if (name === "settings") renderOptionGroups();
     if (name === "report") renderReport();
     if (name === "liquidation") renderLiquidation();
     window.scrollTo({ top: 0 });
+    // pull the latest shared data, then redraw
+    refreshLog().then(() => {
+      renderLog();
+      if (name === "report") renderReport();
+      if (name === "liquidation") renderLiquidation();
+    }).catch(() => {});
   }
+
   menuBtn.addEventListener("click", () => setMenu(!drawer.classList.contains("open")));
   overlay.addEventListener("click", () => setMenu(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") setMenu(false); });
-  document.querySelectorAll(".drawer .nav").forEach((b) => {
+  document.querySelectorAll(".drawer .nav[data-view]").forEach((b) => {
     b.addEventListener("click", () => { setMenu(false); showView(b.dataset.view); });
   });
 
   fillSelects();
 
-  function loadLog() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-    catch (e) { return []; }
-  }
-  function saveLog(list) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch (e) {}
-  }
-
+  /* ---------- Payment form ---------- */
   function makeRef() {
     const d = new Date();
     const p = (n) => String(n).padStart(2, "0");
@@ -759,7 +818,7 @@
     if (!course) { setError("course", "Select your course."); ok = false; }
     if (!year) { setError("year", "Select your year."); ok = false; }
     if (!type) { setError("paymentType", "Select a type of payment."); ok = false; }
-    if (!(amount >= 1)) { setError("amount", "Enter an amount of at least \u20B11.00."); ok = false; }
+    if (!(amount >= 1)) { setError("amount", "Enter an amount of at least ₱1.00."); ok = false; }
     else if (amount > 100000) { setError("amount", "Amount is too large."); ok = false; }
     return ok;
   }
@@ -792,7 +851,7 @@
     $("sRef").textContent = t.ref;
     $("sDate").textContent = t.date;
     $("sName").textContent = t.name;
-    $("sCourse").textContent = t.course + " \u2013 " + t.year;
+    $("sCourse").textContent = t.course + " – " + t.year;
     $("sType").textContent = t.type;
     $("sAmount").textContent = peso(t.amount);
     $("slip").classList.add("show");
@@ -802,45 +861,47 @@
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    $("submitErr").textContent = "";
     if (!validate()) return;
 
+    const now = new Date();
     const t = {
       ref: makeRef(),
-      date: new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }),
+      date: fmtDate(now),
+      day: localDay(now),
       name: $("fullName").value.trim(),
       course: $("course").value.trim(),
       year: $("year").value,
       type: $("paymentType").value,
-      amount: Math.round(parseFloat($("amount").value) * 100) / 100,
-      day: localDay(new Date())
+      amount: Math.round(parseFloat($("amount").value) * 100) / 100
     };
 
     const btn = $("submitBtn");
     btn.disabled = true; btn.textContent = "Submitting...";
-
-    const list = loadLog();
-    list.push(t);
-    saveLog(list);
-
-    if (SHEET_URL) {
-      try {
-        await fetch(SHEET_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(t)
-        });
-      } catch (err) { /* still saved locally */ }
+    try {
+      const { error } = await sb.from("transactions").insert({
+        ref: t.ref, name: t.name, course: t.course, year: t.year, type: t.type, amount: t.amount
+      });
+      if (error) {
+        $("submitErr").textContent = /fetch|network/i.test(error.message)
+          ? "Can't reach the server. Check your internet connection and try again."
+          : "Could not save the payment: " + error.message;
+        return;
+      }
+      LOG.push(t);
+      renderLog();
+      showSlip(t);
+      form.reset();
+    } catch (x) {
+      $("submitErr").textContent = "Could not save the payment. Check your internet connection and try again.";
+    } finally {
+      btn.disabled = false; btn.textContent = "Submit Payment";
     }
-
-    btn.disabled = false; btn.textContent = "Submit Payment";
-    renderLog();
-    showSlip(t);
-    form.reset();
   });
 
   form.addEventListener("reset", () => {
     ["fullName", "course", "year", "paymentType", "amount"].forEach((f) => setError(f, ""));
+    $("submitErr").textContent = "";
   });
 
   $("printBtn").addEventListener("click", () => window.print());
@@ -853,7 +914,7 @@
 
   $("pdfBtn").addEventListener("click", () => {
     if (!loadLog().length) { alert("No transactions to print."); return; }
-    $("logGen").textContent = "Generated " + new Date().toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" });
+    $("logGen").textContent = "Generated " + fmtDate(new Date());
     document.body.classList.add("print-log");
     const oldTitle = document.title;
     document.title = "CIT-SG Transactions - " + localDay(new Date()); // becomes the PDF file name
@@ -864,25 +925,40 @@
     window.print();
   });
 
+  /* ---------- Clear log (admins only) with confirmation pop-up ---------- */
   const clearModal = $("clearModal");
   function setClearModal(open) {
     clearModal.classList.toggle("open", open);
     if (open) $("clearCancel").focus();
   }
   $("clearLogBtn").addEventListener("click", () => {
+    if (!isAdmin()) return;
     const n = loadLog().length;
     if (!n) { alert("There are no transactions to clear."); return; }
     $("clearMsg").textContent = "All " + n + (n === 1 ? " transaction" : " transactions") +
-      " saved on this device will be permanently deleted. This cannot be undone.";
+      " will be permanently deleted for every officer. This cannot be undone.";
     setClearModal(true);
   });
   $("clearCancel").addEventListener("click", () => setClearModal(false));
   clearModal.addEventListener("click", (e) => { if (e.target === clearModal) setClearModal(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") setClearModal(false); });
-  $("clearConfirm").addEventListener("click", () => {
-    saveLog([]);
-    renderLog();
-    setClearModal(false);
+  $("clearConfirm").addEventListener("click", async () => {
+    const btn = $("clearConfirm");
+    btn.disabled = true;
+    try {
+      const { error, count } = await sb.from("transactions").delete({ count: "exact" }).gt("id", 0);
+      if (error || (count === 0 && LOG.length > 0)) {
+        alert("Could not clear the log. Only admins can do this.");
+      } else {
+        LOG = [];
+        renderLog();
+      }
+    } catch (x) {
+      alert("Could not reach the server. Please try again.");
+    } finally {
+      btn.disabled = false;
+      setClearModal(false);
+    }
   });
 
   /* ---------- Type of Payment report (view + print/PDF) ---------- */
@@ -944,17 +1020,7 @@
     window.print();
   });
 
-  /* ---------- Liquidation report (by date, view + print/PDF) ---------- */
-  function localDay(d) {
-    const p = (n) => String(n).padStart(2, "0");
-    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
-  }
-  function dayOf(t) {
-    if (t.day) return t.day;
-    const d = new Date(t.date);
-    return isNaN(d) ? null : localDay(d);
-  }
-
+  /* ---------- Liquidation report (by date and type, view + print/PDF) ---------- */
   function renderLiquidation() {
     const inp = $("liqDate");
     if (!inp.value) inp.value = localDay(new Date());
@@ -1003,23 +1069,23 @@
       if (!(t.type in sums)) { sums[t.type] = { n: 0, amt: 0 }; order.push(t.type); }
       sums[t.type].n += 1; sums[t.type].amt += t.amount;
     });
-    const sb = $("liqSumBody");
-    sb.innerHTML = "";
+    const sb2 = $("liqSumBody");
+    sb2.innerHTML = "";
     if (!order.length) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
       td.colSpan = 3; td.className = "empty"; td.textContent = "Nothing to summarize.";
-      tr.appendChild(td); sb.appendChild(tr);
+      tr.appendChild(td); sb2.appendChild(tr);
     } else {
-      order.forEach((type) => {
+      order.forEach((ty) => {
         const tr = document.createElement("tr");
-        [type, String(sums[type].n), peso(sums[type].amt)].forEach((v, i) => {
+        [ty, String(sums[ty].n), peso(sums[ty].amt)].forEach((v, i) => {
           const td = document.createElement("td");
           td.textContent = v;
           if (i > 0) td.className = "num";
           tr.appendChild(td);
         });
-        sb.appendChild(tr);
+        sb2.appendChild(tr);
       });
     }
 
@@ -1027,7 +1093,7 @@
       ? new Date(day + "T00:00:00").toLocaleDateString("en-PH", { dateStyle: "full" })
       : "No date selected";
     $("liqTypeTitle").textContent = type === ALL ? "All types of payment" : type;
-    $("liqGen").textContent ="Generated " + new Date().toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" });
+    $("liqGen").textContent = "Generated " + new Date().toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" });
     $("liqCount").textContent = "(" + list.length + (list.length === 1 ? " transaction)" : " transactions)");
     $("liqTotal").textContent = peso(list.reduce((s, t) => s + t.amount, 0));
   }
@@ -1043,39 +1109,40 @@
     window.print();
   });
 
-  /* ---------- Login / Sign up (accounts are stored on this device) ---------- */
-  const USERS_KEY = "cit_sg_users_v1";
-  const SESSION_KEY = "cit_sg_session_v1";
-  let failedLogins = 0, lockUntil = 0;
-
-  function loadUsers() {
-    try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch (e) { return {}; }
-  }
-  function saveUsers(u) {
-    try { localStorage.setItem(USERS_KEY, JSON.stringify(u)); } catch (e) {}
-  }
-  const toB64 = (bytes) => btoa(String.fromCharCode.apply(null, Array.from(bytes)));
-  const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-
-  async function hashPw(pw, saltB64) {
-    if (!window.crypto || !crypto.subtle) throw new Error("insecure");
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveBits"]);
-    const bits = await crypto.subtle.deriveBits(
-      { name: "PBKDF2", salt: fromB64(saltB64), iterations: 150000, hash: "SHA-256" }, key, 256);
-    return toB64(new Uint8Array(bits));
+  /* ---------- Login / Sign up (Supabase accounts, shared by every device) ---------- */
+  function niceAuthError(error) {
+    const m = (error && error.message) || "";
+    if (/Invalid login credentials/i.test(m)) return "Incorrect email or password.";
+    if (/Email not confirmed/i.test(m)) return "Please confirm your email first (check your inbox), then sign in.";
+    if (/already registered|already been registered/i.test(m)) return "That email is already registered. Try signing in.";
+    if (/rate limit|too many/i.test(m)) return "Too many attempts. Please wait a few minutes and try again.";
+    if (/fetch|network/i.test(m)) return "Can't reach the server. Check your internet connection and try again.";
+    return m || "Something went wrong. Please try again.";
   }
 
-  function currentUser() {
-    let name = null;
-    try { name = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY); } catch (e) {}
-    const u = name && loadUsers()[name];
-    return u ? { username: name, name: u.name } : null;
+  async function loadMe() {
+    const { data } = await sb.auth.getSession();
+    const session = data && data.session;
+    if (!session) { me = null; return; }
+    const user = session.user;
+    const r = await sb.from("members").select("role").eq("user_id", user.id).maybeSingle();
+    if (r.error) throw r.error;
+    me = {
+      id: user.id,
+      email: user.email,
+      name: (user.user_metadata && user.user_metadata.full_name) || user.email,
+      role: r.data ? r.data.role : null
+    };
   }
 
   function applyAuthState() {
-    const u = currentUser();
-    document.body.classList.toggle("locked", !u);
-    $("meName").textContent = u ? "Signed in as " + u.name : "";
+    const member = isMember();
+    const pending = !!me && !member;
+    document.body.classList.toggle("locked", !member);
+    document.body.classList.toggle("is-admin", isAdmin());
+    $("meName").textContent = member ? "Signed in as " + me.name : "";
+    $("authForms").style.display = pending ? "none" : "";
+    $("pendingBox").style.display = pending ? "" : "none";
   }
 
   function setAuthTab(tab) {
@@ -1084,93 +1151,115 @@
     $("signupForm").style.display = signin ? "none" : "";
     $("tabSignin").classList.toggle("active", signin);
     $("tabSignup").classList.toggle("active", !signin);
-    $("signinErr").textContent = ""; $("signupErr").textContent = "";
+    $("signinErr").textContent = ""; $("signupErr").textContent = ""; $("signupInfo").textContent = "";
   }
 
-  function startSession(username, keep) {
-    try {
-      sessionStorage.removeItem(SESSION_KEY); localStorage.removeItem(SESSION_KEY);
-      (keep ? localStorage : sessionStorage).setItem(SESSION_KEY, username);
-    } catch (e) {}
+  async function enterApp() {
+    await loadMe();
+    if (isMember()) {
+      await Promise.all([loadOptionsOnline(), refreshLog()]);
+      fillSelects();
+      renderLog();
+    }
     applyAuthState();
-    setMenu(false);
-    showView("pay");
   }
 
-  function authError(el, x) {
-    el.textContent = x && x.message === "insecure"
-      ? "This browser can't secure passwords here. Open the site over https."
-      : "Something went wrong. Please try again.";
+  async function signOutNow() {
+    try { await sb.auth.signOut(); } catch (e) {}
+    me = null; LOG = [];
+    $("slip").classList.remove("show");
+    $("formCard").style.display = "";
+    setViewDisplay("pay");
+    applyAuthState();
+    setAuthTab("signin");
+    window.scrollTo({ top: 0 });
   }
 
   $("tabSignin").addEventListener("click", () => setAuthTab("signin"));
   $("tabSignup").addEventListener("click", () => setAuthTab("signup"));
-  $("codeField").style.display = SIGNUP_CODE ? "" : "none";
 
   $("signinForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = $("signinErr"), btn = $("signinBtn");
     err.textContent = "";
-    if (Date.now() < lockUntil) { err.textContent = "Too many attempts. Please wait 30 seconds."; return; }
-    const username = $("siUser").value.trim().toLowerCase();
+    if (!sb) { err.textContent = "This site isn't connected to its database yet."; return; }
+    const email = $("siEmail").value.trim().toLowerCase();
     const pw = $("siPass").value;
-    if (!username || !pw) { err.textContent = "Enter your username and password."; return; }
+    if (!email || !pw) { err.textContent = "Enter your email and password."; return; }
     btn.disabled = true;
     try {
-      const u = loadUsers()[username];
-      const ok = !!u && (await hashPw(pw, u.salt)) === u.hash;
-      if (!ok) {
-        failedLogins += 1;
-        if (failedLogins >= 5) { lockUntil = Date.now() + 30000; failedLogins = 0; }
-        err.textContent = "Incorrect username or password.";
-        return;
-      }
-      failedLogins = 0;
-      const keep = $("siKeep").checked;
+      const { error } = await sb.auth.signInWithPassword({ email: email, password: pw });
+      if (error) { err.textContent = niceAuthError(error); return; }
       $("signinForm").reset();
-      startSession(username, keep);
-    } catch (x) { authError(err, x); }
+      await enterApp();
+      if (isMember()) { setMenu(false); showView("pay"); }
+    } catch (x) { err.textContent = niceAuthError(x); }
     finally { btn.disabled = false; }
   });
 
   $("signupForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const err = $("signupErr"), btn = $("signupBtn");
-    err.textContent = "";
+    const err = $("signupErr"), info = $("signupInfo"), btn = $("signupBtn");
+    err.textContent = ""; info.textContent = "";
+    if (!sb) { err.textContent = "This site isn't connected to its database yet."; return; }
     const name = $("suName").value.trim();
-    const username = $("suUser").value.trim().toLowerCase();
+    const email = $("suEmail").value.trim().toLowerCase();
     const pw = $("suPass").value, pw2 = $("suPass2").value;
+    const code = $("suCode").value.trim();
 
     if (name.length < 3) { err.textContent = "Enter your full name."; return; }
-    if (!/^[a-z0-9._-]{3,30}$/.test(username)) { err.textContent = "Username must be 3-30 characters: letters, numbers, . _ -"; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = "Enter a valid email address."; return; }
     if (pw.length < 6) { err.textContent = "Password must be at least 6 characters."; return; }
     if (pw !== pw2) { err.textContent = "Passwords do not match."; return; }
-    if (SIGNUP_CODE && $("suCode").value.trim() !== SIGNUP_CODE) { err.textContent = "Incorrect access code."; return; }
-
-    const users = loadUsers();
-    if (users[username]) { err.textContent = "That username is already taken."; return; }
 
     btn.disabled = true;
     try {
-      const salt = toB64(crypto.getRandomValues(new Uint8Array(16)));
-      users[username] = { name: name, salt: salt, hash: await hashPw(pw, salt), created: Date.now() };
-      saveUsers(users);
+      const { data, error } = await sb.auth.signUp({
+        email: email, password: pw,
+        options: { data: { full_name: name, access_code: code } }
+      });
+      if (error) { err.textContent = niceAuthError(error); return; }
       $("signupForm").reset();
-      startSession(username, false);
-    } catch (x) { authError(err, x); }
+      if (!data.session) {
+        // email confirmation is switched on in Supabase
+        info.textContent = "Account created. Check your email to confirm it, then sign in.";
+        return;
+      }
+      await enterApp();
+      if (isMember()) { setMenu(false); showView("pay"); }
+    } catch (x) { err.textContent = niceAuthError(x); }
     finally { btn.disabled = false; }
   });
 
-  $("logoutBtn").addEventListener("click", () => {
-    try { sessionStorage.removeItem(SESSION_KEY); localStorage.removeItem(SESSION_KEY); } catch (e) {}
-    setMenu(false);
-    applyAuthState();
-    setAuthTab("signin");
-    window.scrollTo({ top: 0 });
+  $("logoutBtn").addEventListener("click", () => { setMenu(false); signOutNow(); });
+  $("pendingSignout").addEventListener("click", signOutNow);
+  $("pendingRecheck").addEventListener("click", async () => {
+    const btn = $("pendingRecheck");
+    btn.disabled = true;
+    try { await enterApp(); if (isMember()) { showView("pay"); } } catch (x) {}
+    btn.disabled = false;
   });
 
-  applyAuthState();
-  setAuthTab(Object.keys(loadUsers()).length ? "signin" : "signup");
+  if (sb) {
+    sb.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT" && me) { me = null; LOG = []; applyAuthState(); }
+    });
+  }
+
+  // start-up: restore a saved login (if any) and load the shared data
+  (async function boot() {
+    if (!sb) {
+      $("setupNote").style.display = "";
+      document.body.classList.remove("booting");
+      return;
+    }
+    try { await enterApp(); }
+    catch (x) {
+      console.error(x);
+      $("signinErr").textContent = "Could not load the data. Check that the database setup was completed.";
+    }
+    document.body.classList.remove("booting");
+  })();
 
   renderLog();
 </script>
